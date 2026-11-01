@@ -7,6 +7,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -55,6 +56,7 @@ data class AuthUi(
     val error: AppException? = null,
     val done: Boolean = false,
     val sent: Boolean = false,
+    val viaGoogle: Boolean = false,
 )
 
 @HiltViewModel
@@ -75,7 +77,7 @@ class AuthViewModel @Inject constructor(
     }
 
     fun login(email: String, password: String) = run({ session.login(email, password) })
-    fun loginGoogle(activity: android.app.Activity, mock: Boolean) = run({
+    fun loginGoogle(activity: android.app.Activity, mock: Boolean) = run(onOk = { it.copy(done = true, viaGoogle = true) }, block = {
         if (mock) { session.loginGoogle("mock"); return@run }
         when (val r = GoogleSignIn.signIn(activity)) {
             is GoogleSignIn.Result.Token -> session.loginGoogle(r.idToken)
@@ -148,23 +150,7 @@ fun LoginScreen(onLoggedIn: () -> Unit, onRegister: () -> Unit, onForgot: () -> 
     LaunchedEffect(ui.done) { if (ui.done) onLoggedIn() }
     AuthFrame(title = stringResource(R.string.login_title)) {
         if (isMock) MockHint()
-        val activity = androidx.compose.ui.platform.LocalContext.current as? android.app.Activity
-        if ((GoogleSignIn.available || isMock) && activity != null) {
-            OutlinedButton(
-                onClick = { vm.loginGoogle(activity, isMock) }, enabled = !ui.loading,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
-            ) {
-                Text("G", style = MaterialTheme.typography.titleLarge, color = Club.colors.brass)
-                Spacer(Modifier.width(12.dp))
-                Text(stringResource(R.string.login_google), style = MaterialTheme.typography.labelLarge)
-            }
-            Text(stringResource(R.string.login_google_terms), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                HorizontalDivider(Modifier.weight(1f))
-                Text(stringResource(R.string.login_or), Modifier.padding(horizontal = 12.dp), style = MaterialTheme.typography.labelMedium)
-                HorizontalDivider(Modifier.weight(1f))
-            }
-        }
+        GoogleBlock(vm, ui.loading, isMock)
         EmailField(email) { email = it; vm.clearError() }
         PasswordField(pass, ImeAction.Done) { pass = it; vm.clearError() }
         ui.error?.let { ErrorLine(it) }
@@ -184,14 +170,15 @@ private fun MockHint() {
 
 // ---------------- Register ----------------
 @Composable
-fun RegisterScreen(onRegistered: () -> Unit, onBack: () -> Unit, onOpenLegal: (String) -> Unit, vm: AuthViewModel = hiltViewModel()) {
+fun RegisterScreen(onRegistered: () -> Unit, onLoggedIn: () -> Unit, onBack: () -> Unit, onOpenLegal: (String) -> Unit, isMock: Boolean, vm: AuthViewModel = hiltViewModel()) {
     val ui by vm.ui.collectAsState()
     var email by rememberSaveable { mutableStateOf("") }
     var pass by rememberSaveable { mutableStateOf("") }
     var nick by rememberSaveable { mutableStateOf("") }
     var agree by rememberSaveable { mutableStateOf(false) }
-    LaunchedEffect(ui.done) { if (ui.done) onRegistered() }
+    LaunchedEffect(ui.done) { if (ui.done) { if (ui.viaGoogle) onLoggedIn() else onRegistered() } }
     AuthFrame(title = stringResource(R.string.register_title), onBack = onBack) {
+        GoogleBlock(vm, ui.loading, isMock)
         OutlinedTextField(
             nick, { nick = it.take(24); vm.clearError() }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.field_nickname)) },
             singleLine = true, leadingIcon = { Icon(Icons.Filled.Person, null) }, keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
@@ -199,14 +186,20 @@ fun RegisterScreen(onRegistered: () -> Unit, onBack: () -> Unit, onOpenLegal: (S
         )
         EmailField(email) { email = it; vm.clearError() }
         PasswordField(pass, ImeAction.Done, showHint = true) { pass = it; vm.clearError() }
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Checkbox(agree, { agree = it })
-            Column(Modifier.weight(1f)) {
-                Text(stringResource(R.string.register_agree), style = MaterialTheme.typography.bodySmall)
-                Row {
-                    TextButton(onClick = { onOpenLegal("terms") }) { Text(stringResource(R.string.legal_terms)) }
-                    TextButton(onClick = { onOpenLegal("privacy") }) { Text(stringResource(R.string.legal_privacy)) }
-                }
+        // Согласие: галочка с текстом (нажимается вся строка), ссылки — отдельными строками на всю ширину
+        Column(Modifier.fillMaxWidth()) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).clickable { agree = !agree }.heightIn(min = 48.dp),
+            ) {
+                Checkbox(agree, { agree = it })
+                Text(stringResource(R.string.register_agree), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+            }
+            TextButton(onClick = { onOpenLegal("terms") }, Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.legal_terms), Modifier.fillMaxWidth(), textAlign = TextAlign.Start)
+            }
+            TextButton(onClick = { onOpenLegal("privacy") }, Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.legal_privacy), Modifier.fillMaxWidth(), textAlign = TextAlign.Start)
             }
         }
         ui.error?.let { ErrorLine(it) }
@@ -336,4 +329,25 @@ private fun PasswordField(value: String, ime: ImeAction, showHint: Boolean = fal
 fun ErrorLine(e: AppException) {
     if (e.code == "cancelled") return
     Text(errorText(e.code, e.message), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.fillMaxWidth())
+}
+
+/** Кнопка «Войти через Google» + разделитель «или по e-mail». Видна, если задан GOOGLE_WEB_CLIENT_ID (или в демо-режиме). */
+@Composable
+private fun GoogleBlock(vm: AuthViewModel, loading: Boolean, isMock: Boolean) {
+    val activity = androidx.compose.ui.platform.LocalContext.current as? android.app.Activity
+    if (!(GoogleSignIn.available || isMock) || activity == null) return
+    OutlinedButton(
+        onClick = { vm.loginGoogle(activity, isMock) }, enabled = !loading,
+        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+    ) {
+        Text("G", style = MaterialTheme.typography.titleLarge, color = Club.colors.brass)
+        Spacer(Modifier.width(12.dp))
+        Text(stringResource(R.string.login_google), style = MaterialTheme.typography.labelLarge)
+    }
+    Text(stringResource(R.string.login_google_terms), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        HorizontalDivider(Modifier.weight(1f))
+        Text(stringResource(R.string.login_or), Modifier.padding(horizontal = 12.dp), style = MaterialTheme.typography.labelMedium)
+        HorizontalDivider(Modifier.weight(1f))
+    }
 }

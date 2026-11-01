@@ -133,7 +133,10 @@ fun AppNavHost(deepLinkCode: String?, onDeepLinkConsumed: () -> Unit, root: Root
             )
         }
         composable(Routes.REGISTER) {
-            RegisterScreen(onRegistered = { nav.navigate(Routes.VERIFY) { popUpTo(0) } }, onBack = { nav.popBackStack() }, onOpenLegal = { nav.navigate(Routes.legal(it)) })
+            RegisterScreen(
+                onRegistered = { nav.navigate(Routes.VERIFY) { popUpTo(0) } }, onLoggedIn = { nav.navigate(Routes.MAIN) { popUpTo(0) } },
+                onBack = { nav.popBackStack() }, onOpenLegal = { nav.navigate(Routes.legal(it)) }, isMock = root.gateway.isMock,
+            )
         }
         composable(Routes.VERIFY) { VerifyEmailScreen(onDone = { nav.navigate(Routes.MAIN) { popUpTo(0) } }) }
         composable(Routes.FORGOT) { ForgotScreen(onBack = { nav.popBackStack() }) }
