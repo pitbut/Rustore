@@ -9,7 +9,8 @@
 Волчок выбирает сектор на игровом столе, команда до шести знатоков обсуждает вопрос голосом за минуту, капитан называет ответ. Играем до шести очков против «зрителей».
 
 • Голосовое обсуждение в команде, режим «нажми и говори», шумоподавление
-• Блиц, суперблиц и «чёрный ящик» — разные типы секторов
+• Капитан решает, кто из команды отвечает на вопрос
+• Блиц и суперблиц (три вопроса — одно очко) и «чёрный ящик»
 • Досрочный ответ и копилка времени, дополнительная минута голосованием команды
 • Помощь зала: зрители присылают версии и голосуют за лучшие
 • Постоянные команды с друзьями, приглашения, капитан
@@ -26,6 +27,7 @@
 Pirildoq o'yin stolidagi sektorni tanlaydi, oltitagacha bilimdondan iborat jamoa savolni bir daqiqada ovozli muhokama qiladi, kapitan javobni aytadi. «Tomoshabinlar»ga qarshi olti ochkogacha o'ynaymiz.
 
 • Jamoada ovozli muhokama, «bosib gapiring» rejimi, shovqinni bostirish
+• Savolga jamoadan kim javob berishini kapitan hal qiladi
 • Blits, superblits va «qora quti» — turli sektorlar
 • Muddatidan oldin javob va vaqt jamg'armasi, jamoa ovozi bilan qo'shimcha daqiqa
 • Zal yordami: tomoshabinlar versiya yuboradi va eng yaxshisiga ovoz beradi
@@ -68,9 +70,7 @@ Ovoz yozilmaydi. Chatlar moderatsiya qilinadi.
 ## Графика
 - `icon-512.png` — иконка 512×512
 - `feature-1024x500.png` — баннер
-- `screenshots/` — заглушки из UI-тестов. Настоящие скриншоты снимите на телефоне (1080×1920 или больше, 3–8 штук):
-  главная, волчок, вопрос с таймером, помощь зала, ответ (reveal), итог игры, друзья/команды, генератор вопросов.
-  Команда: `adb exec-out screencap -p > shot.png`.
+- `screenshots/` — 8 скриншотов 1080×1920 с подписями (волчок, обсуждение, выбор отвечающего, чёрный ящик и блиц, ответ, победа, чат, помощь зала).
 
 ## Контакты
 Поддержка: gtnz1071980@yandex.com · Политика: https://game.robutpit.com/legal/privacy · Условия: https://game.robutpit.com/legal/terms

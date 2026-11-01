@@ -552,7 +552,7 @@ private fun LobbyPanel(ui: GameUi, vm: GameViewModel, onPlayerMenu: (PlayerInRoo
 
 /** Капитан выбирает, кто из команды отвечает. Не выбрал за 10 с — отвечает сам. */
 @Composable
-private fun ChooseAnswererCard(players: List<PlayerInRoom>, myId: String, onChoose: (String) -> Unit) {
+internal fun ChooseAnswererCard(players: List<PlayerInRoom>, myId: String, onChoose: (String) -> Unit) {
     var chosen by remember { mutableStateOf<String?>(null) }
     ClubCard(Modifier.fillMaxWidth()) {
         Text(stringResource(R.string.choose_title), style = MaterialTheme.typography.titleLarge)
