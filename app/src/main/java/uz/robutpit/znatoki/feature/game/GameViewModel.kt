@@ -42,8 +42,12 @@ data class GameUi(
     val isSpectator: Boolean get() = role == Role.SPECTATOR
     val phase: Phase get() = room?.phase?.phase ?: Phase.LOBBY
     /** Кто отвечает сейчас: в суперблице — выбранный игрок, иначе капитан. */
-    val answererId: String? get() = room?.superblitzPlayerId ?: captain?.id
+    val answererId: String? get() = room?.answererId ?: room?.superblitzPlayerId ?: captain?.id
     val iAnswer: Boolean get() = !isSpectator && answererId == myId
+    /** «Ответ готов» во время обсуждения жмёт капитан (в суперблице — выбранный игрок). */
+    val canFinishDiscussion: Boolean get() = !isSpectator && (room?.superblitzPlayerId ?: captain?.id) == myId
+    /** Капитан выбирает отвечающего прямо сейчас. */
+    val iChooseAnswerer: Boolean get() = isCaptain && phase == Phase.CHOOSE_ANSWERER
     val mutedByHost: Boolean get() = me?.micMutedByHost == true
 }
 
@@ -117,8 +121,12 @@ class GameViewModel @Inject constructor(
         val phase = s.phase.phase
         if (phase != lastPhase) {
             host.discussionActive = phase == Phase.DISCUSS
+            val me = s.players.firstOrNull { it.id == session.myId }
             when (phase) {
                 Phase.DISCUSS -> warned = false
+                // капитану — сигнал «выбирайте отвечающего», выбранному игроку — «отвечаете вы»
+                Phase.CHOOSE_ANSWERER -> if (me?.isCaptain == true && role == Role.PLAYER) { sound.play(Sfx.WARNING); sound.vibrate(80, 180) }
+                Phase.ANSWER -> if (s.answererId == session.myId && role == Role.PLAYER) { sound.play(Sfx.WARNING); sound.vibrate(120, 200) }
                 Phase.GAME_OVER -> sound.play(Sfx.GONG)
                 else -> Unit
             }
@@ -169,6 +177,7 @@ class GameViewModel @Inject constructor(
     // ---- действия (сервер авторитарен; клиент только отправляет намерения) ----
     fun spin() { sound.play(Sfx.SPIN_UP); session.send(ClientAction.Spin) }
     fun readyAnswer() = session.send(ClientAction.ReadyAnswer)
+    fun chooseAnswerer(playerId: String) = session.send(ClientAction.ChooseAnswerer(playerId))
     fun answer(text: String, viaVoice: Boolean) { if (text.isNotBlank()) session.send(ClientAction.Answer(text.trim(), viaVoice)) }
     fun extraMinute() = session.send(ClientAction.ExtraMinuteRequest)
     fun callAudience() = session.send(ClientAction.CallAudience)

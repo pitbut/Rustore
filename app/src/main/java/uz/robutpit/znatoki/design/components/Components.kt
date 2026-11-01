@@ -411,6 +411,9 @@ fun errorRes(code: String): Int? = when (code) {
     "already_requested" -> R.string.err_already_requested
     "forbidden" -> R.string.err_forbidden
     "game_started" -> R.string.err_game_started
+    "google_unavailable" -> R.string.err_google_unavailable
+    "google_failed" -> R.string.err_google_failed
+    "invalid_token" -> R.string.err_unauthorized
     else -> null
 }
 

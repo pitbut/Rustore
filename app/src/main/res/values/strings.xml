@@ -429,4 +429,14 @@
     <string name="vote_pause_title">Поставить игру на паузу?</string>
     <string name="vote_tap_again">Нажмите ещё раз для подтверждения</string>
     <string name="vote_yes">За</string>
+    <string name="phase_choose">Выбор отвечающего</string>
+    <string name="choose_waiting">Капитан %1$s выбирает, кто будет отвечать…</string>
+    <string name="choose_title">Кто отвечает?</string>
+    <string name="choose_hint">У вас 10 секунд. Не успеете выбрать — отвечаете сами.</string>
+    <string name="choose_me">Я отвечу сам</string>
+    <string name="login_google">Войти через Google</string>
+    <string name="login_google_terms">Входя через Google, вы принимаете пользовательское соглашение и политику конфиденциальности.</string>
+    <string name="login_or">или по e-mail</string>
+    <string name="err_google_unavailable">Вход через Google недоступен на этом телефоне. Войдите по e-mail.</string>
+    <string name="err_google_failed">Не удалось войти через Google. Попробуйте ещё раз.</string>
 </resources>

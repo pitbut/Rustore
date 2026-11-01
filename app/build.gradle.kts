@@ -11,6 +11,7 @@ plugins {
 
 val appId: String = providers.gradleProperty("APP_ID").getOrElse("uz.robutpit.znatoki")
 val serverUrl: String = providers.gradleProperty("SERVER_BASE_URL").getOrElse("https://game.robutpit.com")
+val googleClientId: String = providers.gradleProperty("GOOGLE_WEB_CLIENT_ID").getOrElse("")
 
 // Release-подпись: keystore.properties (в .gitignore) или переменные окружения (CI)
 val keystoreProps = Properties().apply {
@@ -35,6 +36,8 @@ android {
 
         buildConfigField("String", "SERVER_BASE_URL", "\"$serverUrl\"")
         buildConfigField("String", "APP_TITLE", "\"Клуб знатоков\"")
+        // Web client ID из Google Cloud Console (тип «Web application»); пусто — кнопка Google скрыта
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$googleClientId\"")
         // false = настоящий сервер game.robutpit.com; в debug можно включить мок в «Настройки → Отладка»
         buildConfigField("boolean", "USE_MOCK", "false")
     }
@@ -133,6 +136,9 @@ dependencies {
     }
     implementation(libs.livekit.android)
     implementation(libs.security.crypto)
+    implementation(libs.credentials)
+    implementation(libs.credentials.play)
+    implementation(libs.googleid)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

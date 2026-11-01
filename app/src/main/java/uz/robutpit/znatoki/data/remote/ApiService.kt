@@ -13,6 +13,7 @@ interface ApiService {
 
     @POST("auth/register") suspend fun register(@Body b: RegisterDto): AuthTokens
     @POST("auth/login") suspend fun login(@Body b: LoginDto): AuthTokens
+    @POST("auth/google") suspend fun loginGoogle(@Body b: GoogleDto): AuthTokens
     @POST("auth/refresh") suspend fun refresh(@Body b: RefreshDto): AuthTokens
     @POST("auth/forgot") suspend fun forgot(@Body b: EmailDto)
     @POST("auth/reset") suspend fun reset(@Body b: ResetDto)
@@ -69,6 +70,7 @@ interface ApiService {
 @Serializable data class TimeDto(val now: Long)
 @Serializable data class RegisterDto(val email: String, val password: String, val nickname: String)
 @Serializable data class LoginDto(val email: String, val password: String)
+@Serializable data class GoogleDto(val idToken: String)
 @Serializable data class RefreshDto(val refreshToken: String)
 @Serializable data class EmailDto(val email: String)
 @Serializable data class ResetDto(val token: String, val password: String)

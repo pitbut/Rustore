@@ -7,7 +7,10 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 enum class Phase {
-    LOBBY, SPIN, INTRO, DISCUSS, ANSWER, CHECK, REVEAL, SCORE, GAME_OVER,
+    LOBBY, SPIN, INTRO, DISCUSS,
+    /** Капитан выбирает, кто из команды отвечает (10 с). Не выбрал — отвечает сам. */
+    CHOOSE_ANSWERER,
+    ANSWER, CHECK, REVEAL, SCORE, GAME_OVER,
     VOTE_EXTRA_MINUTE, AUDIENCE_HELP, PAUSED
 }
 
@@ -190,6 +193,8 @@ data class RoomState(
     val appealsLeft: Int = 1,
     val pausedReason: String? = null,
     val superblitzPlayerId: String? = null,
+    /** Кто отвечает на текущий вопрос (выбран капитаном / суперблиц / сам капитан). */
+    val answererId: String? = null,
     val gameOver: GameOver? = null,
     val seq: Long = 0,
 )
@@ -209,6 +214,7 @@ sealed interface ServerEvent {
     data class AudienceStartedEvt(val endsAt: Long, override val seq: Long) : ServerEvent
     data class AudienceSuggestionsEvt(val list: List<AudienceSuggestion>, override val seq: Long) : ServerEvent
     data class TimeExtendedEvt(val addedSec: Int, val newEndsAt: Long, override val seq: Long) : ServerEvent
+    data class AnswererEvt(val playerId: String, override val seq: Long) : ServerEvent
     data class PlayerKickedEvt(val playerId: String, override val seq: Long) : ServerEvent
     data class PlayerStatusEvt(val playerId: String, val online: Boolean, override val seq: Long) : ServerEvent
     data class ChatEvt(val message: ChatMessage, override val seq: Long) : ServerEvent
@@ -226,6 +232,7 @@ sealed interface ClientAction {
     data class UpdateSettings(val settings: RoomSettings) : ClientAction
     data object Spin : ClientAction
     data object ReadyAnswer : ClientAction
+    data class ChooseAnswerer(val playerId: String) : ClientAction
     data class Answer(val text: String, val viaVoice: Boolean) : ClientAction
     data object ExtraMinuteRequest : ClientAction
     data object CallAudience : ClientAction

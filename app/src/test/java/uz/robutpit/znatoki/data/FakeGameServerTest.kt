@@ -29,6 +29,10 @@ class FakeGameServerTest {
         var appeals = 0
         var reveals = 0
         var spinsChecked = 0
+        var chooses = 0
+        var botAnswerers = 0
+        var timeoutCaptain = 0
+        var answerPhaseMs = 0L
         var errors = mutableListOf<String>()
         var over: GameOver? = null
         var score = Score()
@@ -63,8 +67,19 @@ class FakeGameServerTest {
                             else if (rnd.nextFloat() < 0.3f && (s.superblitzPlayerId ?: "me") == "me") server.send(ClientAction.ReadyAnswer)
                             s.vote?.let { v -> if (v.myVote == null) server.send(ClientAction.VoteCast(v.voteId, true)) }
                         }
+                        Phase.CHOOSE_ANSWERER -> if (s.players.first { it.isCaptain }.id == "me") {
+                            st.chooses++
+                            val roll = rnd.nextFloat()
+                            when {
+                                roll < 0.4f -> server.send(ClientAction.ChooseAnswerer("me"))
+                                roll < 0.8f -> server.send(ClientAction.ChooseAnswerer(s.players.first { it.isBot }.id))
+                                else -> Unit // не выбираем — должен отвечать сам капитан
+                            }
+                        }
                         Phase.ANSWER -> {
-                            val answerer = s.superblitzPlayerId ?: s.players.first { it.isCaptain }.id
+                            st.answerPhaseMs = maxOf(st.answerPhaseMs, e.info.endsAt - (System.currentTimeMillis() + 1250))
+                            val answerer = s.answererId ?: error("answererId не пришёл до фазы ANSWER")
+                            if (s.superblitzPlayerId == null && s.players.firstOrNull { it.id == answerer }?.isBot == true) st.botAnswerers++
                             if (answerer == "me") {
                                 val q = bank.getValue(s.question!!.id)
                                 val right = if (q.parts.isNotEmpty()) q.parts[s.question!!.subIndex].answer else q.answer
@@ -109,13 +124,15 @@ class FakeGameServerTest {
     @Test fun `full games reach 6 points and cover every sector type`() {
         val all = mutableSetOf<SectorType>()
         val votes = mutableSetOf<VoteKind>()
-        var extended = 0; var kicked = 0; var audience = 0; var spins = 0
+        var extended = 0; var kicked = 0; var audience = 0; var spins = 0; var chooses = 0; var botAns = 0
         for (seed in 1..6) {
             val st = playGame(seed, RoomSettings(teamSize = 5, fillWithBots = true, sectors = 13, discussSec = 30, rated = true))
             assertNotNull(st.over)
             assertTrue("score ${st.score}", st.score.experts == 6 || st.score.viewers == 6)
             assertEquals(if (st.score.experts == 6) "experts" else "viewers", st.over!!.winner)
             all += st.types; votes += st.votes
+            chooses += st.chooses; botAns += st.botAnswerers
+            assertTrue("answer phase ~30 s scaled", st.answerPhaseMs in 150..400)
             extended += st.timeExtended; kicked += st.kicked; audience += st.audienceSuggestions; spins += st.spinsChecked
             assertFalse("unexpected errors ${st.errors}", st.errors.any { it == "not_in_room" || it == "unauthorized" })
             if (all.containsAll(listOf(SectorType.NORMAL, SectorType.BLITZ, SectorType.SUPERBLITZ, SectorType.BLACKBOX)) && seed >= 2) break
@@ -125,6 +142,8 @@ class FakeGameServerTest {
         assertTrue(VoteKind.KICK in votes)
         assertTrue("audience help gave versions", audience > 0)
         assertTrue(spins >= 6)
+        assertTrue("captain chose answerer", chooses > 0)
+        assertTrue("chosen bot answered", botAns > 0)
         println("types=$all votes=$votes extended=$extended kicked=$kicked audience=$audience spins=$spins")
     }
 

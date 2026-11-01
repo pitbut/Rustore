@@ -75,6 +75,15 @@ class AuthViewModel @Inject constructor(
     }
 
     fun login(email: String, password: String) = run({ session.login(email, password) })
+    fun loginGoogle(activity: android.app.Activity, mock: Boolean) = run({
+        if (mock) { session.loginGoogle("mock"); return@run }
+        when (val r = GoogleSignIn.signIn(activity)) {
+            is GoogleSignIn.Result.Token -> session.loginGoogle(r.idToken)
+            GoogleSignIn.Result.Cancelled -> throw AppException("cancelled", "")
+            GoogleSignIn.Result.Unavailable -> throw AppException("google_unavailable")
+            is GoogleSignIn.Result.Failed -> throw AppException("google_failed", r.message)
+        }
+    })
     fun register(email: String, password: String, nick: String) = run({ session.register(email, password, nick) })
     fun forgot(email: String) = run({ gateway.forgotPassword(email.trim()) }) { it.copy(sent = true) }
     fun reset(token: String, password: String) = run({ gateway.resetPassword(token.trim(), password) })
@@ -139,6 +148,23 @@ fun LoginScreen(onLoggedIn: () -> Unit, onRegister: () -> Unit, onForgot: () -> 
     LaunchedEffect(ui.done) { if (ui.done) onLoggedIn() }
     AuthFrame(title = stringResource(R.string.login_title)) {
         if (isMock) MockHint()
+        val activity = androidx.compose.ui.platform.LocalContext.current as? android.app.Activity
+        if ((GoogleSignIn.available || isMock) && activity != null) {
+            OutlinedButton(
+                onClick = { vm.loginGoogle(activity, isMock) }, enabled = !ui.loading,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+            ) {
+                Text("G", style = MaterialTheme.typography.titleLarge, color = Club.colors.brass)
+                Spacer(Modifier.width(12.dp))
+                Text(stringResource(R.string.login_google), style = MaterialTheme.typography.labelLarge)
+            }
+            Text(stringResource(R.string.login_google_terms), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                HorizontalDivider(Modifier.weight(1f))
+                Text(stringResource(R.string.login_or), Modifier.padding(horizontal = 12.dp), style = MaterialTheme.typography.labelMedium)
+                HorizontalDivider(Modifier.weight(1f))
+            }
+        }
         EmailField(email) { email = it; vm.clearError() }
         PasswordField(pass, ImeAction.Done) { pass = it; vm.clearError() }
         ui.error?.let { ErrorLine(it) }
@@ -308,5 +334,6 @@ private fun PasswordField(value: String, ime: ImeAction, showHint: Boolean = fal
 
 @Composable
 fun ErrorLine(e: AppException) {
+    if (e.code == "cancelled") return
     Text(errorText(e.code, e.message), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.fillMaxWidth())
 }

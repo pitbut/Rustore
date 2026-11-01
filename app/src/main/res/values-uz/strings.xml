@@ -429,4 +429,14 @@
     <string name="vote_pause_title">O\'yinni pauzaga qo\'yamizmi?</string>
     <string name="vote_tap_again">Tasdiqlash uchun yana bosing</string>
     <string name="vote_yes">Yoqlab</string>
+    <string name="phase_choose">Javob beruvchini tanlash</string>
+    <string name="choose_waiting">Kapitan %1$s kim javob berishini tanlamoqda…</string>
+    <string name="choose_title">Kim javob beradi?</string>
+    <string name="choose_hint">Sizda 10 soniya bor. Tanlashga ulgurmasangiz — o\'zingiz javob berasiz.</string>
+    <string name="choose_me">O\'zim javob beraman</string>
+    <string name="login_google">Google orqali kirish</string>
+    <string name="login_google_terms">Google orqali kirib, siz foydalanuvchi shartnomasi va maxfiylik siyosatini qabul qilasiz.</string>
+    <string name="login_or">yoki e-mail orqali</string>
+    <string name="err_google_unavailable">Bu telefonda Google orqali kirish mavjud emas. E-mail orqali kiring.</string>
+    <string name="err_google_failed">Google orqali kirib bo\'lmadi. Qayta urinib ko\'ring.</string>
 </resources>

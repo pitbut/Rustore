@@ -23,6 +23,8 @@ interface GameGateway {
     // --- auth ---
     suspend fun register(email: String, password: String, nickname: String): AuthTokens
     suspend fun login(email: String, password: String): AuthTokens
+    /** Вход/регистрация через Google: сервер проверяет ID-токен и создаёт аккаунт при первом входе. */
+    suspend fun loginGoogle(idToken: String): AuthTokens
     suspend fun forgotPassword(email: String)
     suspend fun resetPassword(token: String, password: String)
     suspend fun verifyEmail(code: String)

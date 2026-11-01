@@ -48,7 +48,9 @@ class SessionRepository @Inject constructor(
         _auth.value = try {
             AuthState.LoggedIn(gateway.me().also(::remember))
         } catch (e: AppException) {
-            if (e.code == AppException.UNAUTHORIZED) { tokens.tokens = null; AuthState.LoggedOut }
+            // выходим только если сервер окончательно отклонил сессию (TokenRefresher уже стёр токены);
+            // нет интернета или сервер недоступен — остаёмся в аккаунте с кэшированным профилем
+            if (e.code == AppException.UNAUTHORIZED && tokens.tokens == null) AuthState.LoggedOut
             else tokens.lastNickname?.let { AuthState.LoggedIn(Profile("me", tokens.lastEmail ?: "", it, tokens.lastAvatar)) } ?: AuthState.LoggedOut
         }
     }
@@ -59,6 +61,12 @@ class SessionRepository @Inject constructor(
 
     suspend fun login(email: String, password: String) {
         tokens.tokens = gateway.login(email.trim(), password)
+        val p = gateway.me(); remember(p)
+        _auth.value = AuthState.LoggedIn(p)
+    }
+
+    suspend fun loginGoogle(idToken: String) {
+        tokens.tokens = gateway.loginGoogle(idToken)
         val p = gateway.me(); remember(p)
         _auth.value = AuthState.LoggedIn(p)
     }

@@ -20,7 +20,7 @@ import uz.robutpit.znatoki.data.local.AppDatabase
 import uz.robutpit.znatoki.data.local.DebugPrefs
 import uz.robutpit.znatoki.data.mock.FakeGameServer
 import uz.robutpit.znatoki.data.remote.ApiService
-import uz.robutpit.znatoki.data.remote.RefreshDto
+import uz.robutpit.znatoki.data.remote.TokenRefresher
 import uz.robutpit.znatoki.data.remote.RemoteGameGateway
 import uz.robutpit.znatoki.data.remote.TokenStore
 import uz.robutpit.znatoki.domain.GameGateway
@@ -47,21 +47,30 @@ object AppModule {
     fun useMock(@ApplicationContext c: Context): Boolean = DebugPrefs.useMock(c, BuildConfig.USE_MOCK)
 
     @Provides @Singleton
-    fun okHttp(tokens: TokenStore, json: Json): OkHttpClient {
+    fun tokenRefresher(tokens: TokenStore, json: Json): TokenRefresher {
+        val base = OkHttpClient.Builder().connectTimeout(10, TimeUnit.SECONDS).readTimeout(20, TimeUnit.SECONDS).build()
+        val api by lazy {
+            Retrofit.Builder().baseUrl(BuildConfig.SERVER_BASE_URL + "/api/v1/").client(base)
+                .addConverterFactory(json.asConverterFactory("application/json".toMediaType())).build().create(ApiService::class.java)
+        }
+        return TokenRefresher(tokens) { api }
+    }
+
+    @Provides @Singleton
+    fun okHttp(tokens: TokenStore, refresher: TokenRefresher): OkHttpClient {
         val base = OkHttpClient.Builder()
             .connectTimeout(10, TimeUnit.SECONDS).readTimeout(20, TimeUnit.SECONDS)
             .pingInterval(20, TimeUnit.SECONDS)
             .build()
-        // Обновление access-токена по 401 (без логирования токенов и персональных данных)
-        val refresher = Retrofit.Builder().baseUrl(BuildConfig.SERVER_BASE_URL + "/api/v1/").client(base)
-            .addConverterFactory(json.asConverterFactory("application/json".toMediaType())).build().create(ApiService::class.java)
+        // Обновление access-токена по 401 — по одному, без логирования токенов
         val authenticator = Authenticator { _, response ->
             if (response.priorResponse != null) return@Authenticator null
-            val rt = tokens.tokens?.refreshToken ?: return@Authenticator null
-            val fresh = runCatching { runBlocking { refresher.refresh(RefreshDto(rt)) } }.getOrNull()
-            if (fresh == null) { tokens.tokens = null; return@Authenticator null }
-            tokens.tokens = fresh
-            response.request.newBuilder().header("Authorization", "Bearer ${fresh.accessToken}").build()
+            if (response.request.url.encodedPath.contains("/auth/")) return@Authenticator null
+            val failed = response.request.header("Authorization")?.removePrefix("Bearer ")
+            when (val r = refresher.refresh(failed)) {
+                is TokenRefresher.Result.Ok -> response.request.newBuilder().header("Authorization", "Bearer ${r.tokens.accessToken}").build()
+                else -> null
+            }
         }
         return base.newBuilder()
             .addInterceptor { chain ->
@@ -91,8 +100,8 @@ object AppModule {
     @Provides @Singleton
     fun gateway(
         @ApplicationContext c: Context, @Named("useMock") mock: Boolean,
-        api: dagger.Lazy<ApiService>, tokens: TokenStore, client: dagger.Lazy<OkHttpClient>, json: Json,
-    ): GameGateway = if (mock) FakeGameServer(c) else RemoteGameGateway(api.get(), tokens, BuildConfig.SERVER_BASE_URL, client.get(), json)
+        api: dagger.Lazy<ApiService>, tokens: TokenStore, client: dagger.Lazy<OkHttpClient>, json: Json, refresher: TokenRefresher,
+    ): GameGateway = if (mock) FakeGameServer(c) else RemoteGameGateway(api.get(), tokens, BuildConfig.SERVER_BASE_URL, client.get(), json, refresher)
 
     @Provides @Singleton
     fun voice(@ApplicationContext c: Context, @Named("useMock") mock: Boolean, gateway: GameGateway): VoiceManager =

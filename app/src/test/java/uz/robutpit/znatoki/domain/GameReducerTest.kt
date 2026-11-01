@@ -56,7 +56,11 @@ class GameReducerTest {
         assertNull(s!!.vote)
         ev { ServerEvent.PlayerKickedEvt("b", it) }
         assertEquals(1, s!!.players.size)
+        ev { ServerEvent.PhaseEvt(PhaseInfo(Phase.CHOOSE_ANSWERER, 65_000, 1, 3), it) }
+        ev { ServerEvent.AnswererEvt("me", it) }
+        assertEquals("me", s!!.answererId)
         ev { ServerEvent.PhaseEvt(PhaseInfo(Phase.ANSWER, 70_000, 1, 3), it) }
+        assertEquals("answerer kept in ANSWER", "me", s!!.answererId)
         ev { ServerEvent.RevealEvt(Reveal("Ответ", verdict = Verdict.CORRECT, scoreDelta = Score(1, 0)), it) }
         ev { ServerEvent.PhaseEvt(PhaseInfo(Phase.REVEAL, 80_000, 1, 3), it) }
         assertTrue(s!!.sectors[3].played)
@@ -64,6 +68,7 @@ class GameReducerTest {
         ev { ServerEvent.PhaseEvt(PhaseInfo(Phase.SPIN, 90_000, 2), it) }
         assertNull("question cleared on new spin", s!!.question)
         assertNull(s!!.reveal)
+        assertNull("answerer reset", s!!.answererId)
         ev { ServerEvent.GameOverEvt(GameOver("experts"), it) }
         assertEquals(Phase.GAME_OVER, s!!.phase.phase)
         assertEquals(seq, s!!.seq)

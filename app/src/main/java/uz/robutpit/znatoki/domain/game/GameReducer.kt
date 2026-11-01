@@ -31,7 +31,8 @@ object GameReducer {
         is ServerEvent.PhaseEvt -> {
             val p = e.info.phase
             var n = s.copy(phase = e.info)
-            if (p == Phase.SPIN) n = n.copy(question = null, reveal = null, audience = emptyList(), superblitzPlayerId = null)
+            if (p == Phase.SPIN) n = n.copy(question = null, reveal = null, audience = emptyList(), superblitzPlayerId = null, answererId = null)
+            if (p == Phase.DISCUSS || p == Phase.CHOOSE_ANSWERER) n = n.copy(answererId = if (p == Phase.DISCUSS) null else n.answererId)
             if (p == Phase.INTRO) n = n.copy(reveal = null)
             if (e.info.sector >= 0 && p == Phase.REVEAL) {
                 n = n.copy(sectors = n.sectors.map { if (it.index == e.info.sector) it.copy(played = true) else it })
@@ -39,7 +40,8 @@ object GameReducer {
             n
         }
         is ServerEvent.SpinResultEvt -> s.copy(spin = e.spin)
-        is ServerEvent.QuestionEvt -> s.copy(question = e.question, reveal = null)
+        is ServerEvent.QuestionEvt -> s.copy(question = e.question, reveal = null, answererId = null)
+        is ServerEvent.AnswererEvt -> s.copy(answererId = e.playerId)
         is ServerEvent.RevealEvt -> s.copy(reveal = e.reveal)
         is ServerEvent.ScoreEvt -> s.copy(score = e.score)
         is ServerEvent.VoteStartedEvt -> s.copy(vote = e.vote)

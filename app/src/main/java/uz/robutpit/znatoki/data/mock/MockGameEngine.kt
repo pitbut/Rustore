@@ -40,6 +40,7 @@ internal class MockGameEngine(
         data object BotSpin : Msg
         data class BotReadyAnswer(val playerId: String) : Msg
         data class BotAnswer(val playerId: String, val text: String) : Msg
+        data class BotChoose(val playerId: String) : Msg
         data class BotVote(val voteId: String, val playerId: String, val yes: Boolean) : Msg
         data class VoteTimeout(val voteId: String) : Msg
         data object AudienceTick : Msg
@@ -319,13 +320,41 @@ internal class MockGameEngine(
         botChatJob?.cancel()
         if (st.vote?.kind == VoteKind.EXTRA_MINUTE) resolveVote(st.vote!!.voteId, timeout = true)
 
-        // ---- ANSWER ----
+        // ---- CHOOSE_ANSWERER: капитан за 10 с выбирает, кто отвечает; не выбрал — отвечает сам ----
+        val answerer: String
+        if (st.superblitzPlayerId != null) {
+            answerer = st.superblitzPlayerId!!
+        } else {
+            val capNow = captain()
+            var chosen: String? = null
+            if (capNow.isBot) {
+                val pick = if (myRole == Role.PLAYER && myLastTeamMessage != null && rnd.nextFloat() < 0.5f) MockData.ME else st.players.random(rnd).id
+                if (rnd.nextFloat() < 0.85f) launchLater(1500L + rnd.nextLong(3000)) { inbox.trySend(Msg.BotChoose(pick)) }
+            }
+            say("Капитан, кто будет отвечать?")
+            phase(Phase.CHOOSE_ANSWERER, 10_000, sector.index) { m ->
+                when {
+                    m is Msg.Client && m.a is ClientAction.ChooseAnswerer -> when {
+                        capNow.id != MockData.ME -> { error("not_captain"); false }
+                        st.players.none { it.id == m.a.playerId } -> { error("not_member"); false }
+                        else -> { chosen = m.a.playerId; true }
+                    }
+                    m is Msg.BotChoose -> { chosen = m.playerId.takeIf { id -> st.players.any { it.id == id } }; chosen != null }
+                    else -> false
+                }
+            }
+            answerer = chosen ?: capNow.id
+        }
+        st = st.copy(answererId = answerer)
+        emit { ServerEvent.AnswererEvt(answerer, it) }
+
+        // ---- ANSWER: выбранный игрок отвечает до 30 с ----
         var given = ""
         var viaVoice = false
-        val answerer = currentAnswerer
-        if (isBot(answerer)) launchLater(1500L + rnd.nextLong(2500)) { inbox.trySend(Msg.BotAnswer(answerer, botAnswer(part, q.difficulty, answerer))) }
-        say(if (answerer == MockData.ME) "Ваш ответ?" else "Время! Ваш ответ?")
-        phase(Phase.ANSWER, 10_000, sector.index) { m ->
+        val answererName = st.players.firstOrNull { it.id == answerer }?.nickname ?: ""
+        if (isBot(answerer)) launchLater(2500L + rnd.nextLong(4000)) { inbox.trySend(Msg.BotAnswer(answerer, botAnswer(part, q.difficulty, answerer))) }
+        say(if (answerer == MockData.ME) "Отвечаете вы. Ваш ответ?" else "Отвечает $answererName.")
+        phase(Phase.ANSWER, 30_000, sector.index) { m ->
             when {
                 m is Msg.Client && m.a is ClientAction.Answer -> {
                     if (answerer != MockData.ME) { error("not_answerer"); false } else { given = m.a.text.take(200); viaVoice = m.a.viaVoice; true }
@@ -640,7 +669,7 @@ internal class MockGameEngine(
                 is ClientAction.Ack -> if (a.seq < seq) snapshot()
                 is ClientAction.ChatReport -> Unit
                 is ClientAction.Leave -> stop()
-                is ClientAction.Spin, is ClientAction.ReadyAnswer, is ClientAction.Answer, is ClientAction.CallAudience -> error("wrong_phase")
+                is ClientAction.Spin, is ClientAction.ReadyAnswer, is ClientAction.Answer, is ClientAction.CallAudience, is ClientAction.ChooseAnswerer -> error("wrong_phase")
                 is ClientAction.Appeal -> error("appeal_unavailable")
                 is ClientAction.Start, is ClientAction.Ready, is ClientAction.UpdateSettings, is ClientAction.SetCaptain, is ClientAction.AddBot -> error("game_started")
                 is ClientAction.Join -> snapshot()

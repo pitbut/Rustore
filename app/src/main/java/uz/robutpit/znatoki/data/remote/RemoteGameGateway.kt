@@ -28,6 +28,7 @@ class RemoteGameGateway(
     private val baseUrl: String,
     private val okHttp: OkHttpClient,
     private val json: Json,
+    private val refresher: TokenRefresher,
 ) : GameGateway {
     override val isMock = false
 
@@ -50,6 +51,7 @@ class RemoteGameGateway(
 
     override suspend fun register(email: String, password: String, nickname: String) = call { api.register(RegisterDto(email, password, nickname)) }
     override suspend fun login(email: String, password: String) = call { api.login(LoginDto(email, password)) }
+    override suspend fun loginGoogle(idToken: String) = call { api.loginGoogle(GoogleDto(idToken)) }
     override suspend fun forgotPassword(email: String) = call { api.forgot(EmailDto(email)) }
     override suspend fun resetPassword(token: String, password: String) = call { api.reset(ResetDto(token, password)) }
     override suspend fun verifyEmail(code: String) = call { api.verifyEmail(CodeDto(code)) }
@@ -128,9 +130,22 @@ class RemoteGameGateway(
             lastJoin?.let { j -> emitJoin(s, j); s.emit("game:ack", JSONObject().put("seq", lastSeq)) }
         }
         s.on(Socket.EVENT_DISCONNECT) { _connection.value = ConnectionState.RECONNECTING }
-        s.on(Socket.EVENT_CONNECT_ERROR) { _connection.value = ConnectionState.RECONNECTING }
+        s.on(Socket.EVENT_CONNECT_ERROR) { args ->
+            _connection.value = ConnectionState.RECONNECTING
+            // токен истёк (сервер отклонил рукопожатие) — продлеваем сессию и переподключаемся
+            val msg = args.firstOrNull()?.toString().orEmpty()
+            if (msg.contains("unauthorized", true) || msg.contains("token", true) || msg.contains("auth", true)) {
+                Thread {
+                    if (refresher.refresh(opts.auth["token"]) is TokenRefresher.Result.Ok) {
+                        opts.auth = mapOf("token" to (tokens.tokens?.accessToken ?: ""))
+                        if (!s.connected()) s.connect()
+                    }
+                }.start()
+            }
+        }
         s.io().on(io.socket.client.Manager.EVENT_RECONNECT_ATTEMPT) {
-            // обновляем токен для повторного рукопожатия
+            // перед повторным рукопожатием подставляем актуальный (при необходимости — продлённый) токен
+            if (refresher.accessExpiresSoon()) refresher.refresh(null)
             opts.auth = mapOf("token" to (tokens.tokens?.accessToken ?: ""))
         }
         registerHandlers(s)
@@ -166,6 +181,7 @@ class RemoteGameGateway(
         on(s, "audience:started") { o, seq -> ServerEvent.AudienceStartedEvt(o["endsAt"]!!.jsonPrimitive.long, seq) }
         on(s, "audience:suggestions") { o, seq -> ServerEvent.AudienceSuggestionsEvt(json.decodeFromJsonElement(o["suggestions"] ?: JsonArray(emptyList())), seq) }
         on(s, "time:extended") { o, seq -> ServerEvent.TimeExtendedEvt(o["addedSec"]!!.jsonPrimitive.int, o["newEndsAt"]!!.jsonPrimitive.long, seq) }
+        on(s, "game:answerer") { o, seq -> ServerEvent.AnswererEvt(o["playerId"]!!.jsonPrimitive.content, seq) }
         on(s, "player:kicked") { o, seq -> ServerEvent.PlayerKickedEvt(o["playerId"]!!.jsonPrimitive.content, seq) }
         on(s, "player:status") { o, seq -> ServerEvent.PlayerStatusEvt(o["id"]!!.jsonPrimitive.content, o["online"]!!.jsonPrimitive.boolean, seq) }
         on(s, "chat:message") { o, seq -> ServerEvent.ChatEvt(o.decode(), seq) }
@@ -192,6 +208,7 @@ class RemoteGameGateway(
             is ClientAction.UpdateSettings -> e("room:settings", JSONObject(json.encodeToString(RoomSettings.serializer(), action.settings)))
             ClientAction.Spin -> e("game:spin")
             ClientAction.ReadyAnswer -> e("game:ready_answer")
+            is ClientAction.ChooseAnswerer -> e("game:choose_answerer", JSONObject().put("playerId", action.playerId))
             is ClientAction.Answer -> e("game:answer", JSONObject().put("text", action.text).put("viaVoice", action.viaVoice))
             ClientAction.ExtraMinuteRequest -> e("game:extra_minute_request")
             ClientAction.CallAudience -> e("game:call_audience")

@@ -107,6 +107,15 @@ class FakeGameServer(
         return tokens()
     }
 
+    override suspend fun loginGoogle(idToken: String): AuthTokens {
+        lag()
+        if (profile == null) {
+            profile = Profile("me", "google.user@gmail.com", "Знаток", avatar = 2, emailVerified = true, rating = 1500, achievements = MockData.achievements.map { it.copy(unlocked = false) })
+            seedInvites()
+        }
+        return tokens()
+    }
+
     /** Восстановление сессии по сохранённому токену (мок не хранит состояние между запусками). */
     fun restore(email: String, nickname: String, avatar: Int) {
         if (profile == null) {

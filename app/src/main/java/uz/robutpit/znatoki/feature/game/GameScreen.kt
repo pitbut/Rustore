@@ -280,7 +280,7 @@ private fun Stage(
     val group = when (phase) {
         Phase.LOBBY -> 0
         Phase.SPIN, Phase.INTRO -> 1
-        Phase.DISCUSS, Phase.ANSWER, Phase.CHECK, Phase.VOTE_EXTRA_MINUTE, Phase.AUDIENCE_HELP -> 2
+        Phase.DISCUSS, Phase.CHOOSE_ANSWERER, Phase.ANSWER, Phase.CHECK, Phase.VOTE_EXTRA_MINUTE, Phase.AUDIENCE_HELP -> 2
         Phase.REVEAL, Phase.SCORE -> 3
         Phase.GAME_OVER -> 4
         Phase.PAUSED -> 5
@@ -365,6 +365,7 @@ private fun QuestionStage(ui: GameUi, vm: GameViewModel, serverNow: () -> Long, 
             Text(
                 when (phase) {
                     Phase.DISCUSS -> stringResource(R.string.phase_discuss)
+                    Phase.CHOOSE_ANSWERER -> stringResource(R.string.phase_choose)
                     Phase.ANSWER -> stringResource(R.string.phase_answer)
                     Phase.CHECK -> stringResource(R.string.phase_check)
                     else -> ""
@@ -388,6 +389,10 @@ private fun QuestionStage(ui: GameUi, vm: GameViewModel, serverNow: () -> Long, 
         Text(stringResource(R.string.superblitz_player, if (id == ui.myId) stringResource(R.string.player_you) else name), style = MaterialTheme.typography.titleMedium, color = Club.colors.brass)
     }
     q?.let { QuestionCard(it, blackboxOpen = false) }
+    if (phase == Phase.CHOOSE_ANSWERER) {
+        if (ui.iChooseAnswerer) ChooseAnswererCard(room.players, ui.myId, vm::chooseAnswerer)
+        else Text(stringResource(R.string.choose_waiting, ui.captain?.nickname ?: ""), style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center)
+    }
     if (phase == Phase.ANSWER) {
         if (ui.iAnswer) AnswerInput(onSubmit = vm::answer, onVoice = onVoice, voiceAvailable = voiceAvailable)
         else Text(stringResource(R.string.answer_waiting, room.players.firstOrNull { it.id == ui.answererId }?.nickname ?: ""), style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center)
@@ -434,7 +439,7 @@ private fun ActionBar(
                 }
                 Spacer(Modifier.width(8.dp))
                 Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    if (discuss && ui.iAnswer) ClubButton(stringResource(R.string.action_ready_answer), onReady, Modifier.weight(1f))
+                    if (discuss && ui.canFinishDiscussion) ClubButton(stringResource(R.string.action_ready_answer), onReady, Modifier.weight(1f))
                     if (discuss) OutlinedButton(onClick = onExtra, Modifier.heightIn(min = 48.dp), enabled = room.vote == null && (room.extraMinutesLeft > 0 || room.timeBankSec > 0)) {
                         Icon(Icons.Filled.MoreTime, stringResource(R.string.action_extra_minute))
                     }
@@ -537,4 +542,32 @@ private fun LobbyPanel(ui: GameUi, vm: GameViewModel, onPlayerMenu: (PlayerInRoo
             )
         },
     )
+}
+
+/** Капитан выбирает, кто из команды отвечает. Не выбрал за 10 с — отвечает сам. */
+@Composable
+private fun ChooseAnswererCard(players: List<PlayerInRoom>, myId: String, onChoose: (String) -> Unit) {
+    var chosen by remember { mutableStateOf<String?>(null) }
+    ClubCard(Modifier.fillMaxWidth()) {
+        Text(stringResource(R.string.choose_title), style = MaterialTheme.typography.titleLarge)
+        Text(stringResource(R.string.choose_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(8.dp))
+        players.forEach { p ->
+            val selected = chosen == p.id
+            OutlinedButton(
+                onClick = { if (chosen == null) { chosen = p.id; onChoose(p.id) } },
+                enabled = chosen == null || selected,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(vertical = 3.dp),
+                border = androidx.compose.foundation.BorderStroke(if (selected) 2.dp else 1.dp, if (selected) Club.colors.brass else MaterialTheme.colorScheme.outlineVariant),
+            ) {
+                PlayerAvatar(p.avatar, size = 36.dp, isBot = p.isBot, captain = p.isCaptain, online = p.online)
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    if (p.id == myId) stringResource(R.string.choose_me) else p.nickname,
+                    Modifier.weight(1f), style = MaterialTheme.typography.titleMedium,
+                )
+                if (selected) Icon(Icons.Filled.CheckCircle, null, tint = Club.colors.brass)
+            }
+        }
+    }
 }
