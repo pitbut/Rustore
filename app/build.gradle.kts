@@ -35,7 +35,8 @@ android {
 
         buildConfigField("String", "SERVER_BASE_URL", "\"$serverUrl\"")
         buildConfigField("String", "APP_TITLE", "\"Клуб знатоков\"")
-        buildConfigField("boolean", "USE_MOCK", "true")
+        // false = настоящий сервер game.robutpit.com; в debug можно включить мок в «Настройки → Отладка»
+        buildConfigField("boolean", "USE_MOCK", "false")
     }
 
     androidResources {
@@ -66,8 +67,7 @@ android {
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             val rc = signingConfigs.getByName("release")
             signingConfig = if (rc.storeFile != null) rc else signingConfigs.getByName("debug")
-            // В релизе по умолчанию тоже мок, пока сервер не готов. Поменяйте на false после запуска сервера.
-            buildConfigField("boolean", "USE_MOCK", "true")
+            buildConfigField("boolean", "USE_MOCK", "false")
         }
     }
 
