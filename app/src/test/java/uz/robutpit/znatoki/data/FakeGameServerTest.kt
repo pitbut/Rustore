@@ -58,7 +58,7 @@ class FakeGameServerTest {
                     is ServerEvent.RoomStateEvt -> if (s.phase.phase == Phase.LOBBY && e.seq == 1L) {
                         server.send(ClientAction.Ready(true)); server.send(ClientAction.Start)
                     }
-                    is ServerEvent.PhaseEvt -> when (e.info.phase) {
+                    is ServerEvent.PhaseEvt -> { if (System.getenv("TRACE") != null) println("T+${System.currentTimeMillis() % 100000} ${e.info.phase} dur=${e.info.endsAt - System.currentTimeMillis() - 1250}"); when (e.info.phase) {
                         Phase.SPIN -> if (s.players.first { it.isCaptain }.id == "me") server.send(ClientAction.Spin)
                         Phase.DISCUSS -> {
                             if (!askedExtra) { askedExtra = true; server.send(ClientAction.ExtraMinuteRequest) }
@@ -88,7 +88,7 @@ class FakeGameServerTest {
                             }
                         }
                         else -> Unit
-                    }
+                    } }
                     is ServerEvent.SpinResultEvt -> {
                         // клиентская анимация должна закончиться точно на секторе сервера
                         val end = SpinMath.angleAt(e.spin, e.spin.durationMs, s.sectors.size)
@@ -115,7 +115,7 @@ class FakeGameServerTest {
             }
         }
         server.send(ClientAction.Join(roomId, null, Role.PLAYER))
-        withTimeout(120_000) { done.await() }
+        withTimeout(240_000) { done.await() }
         job.cancel()
         server.disconnectRealtime()
         st

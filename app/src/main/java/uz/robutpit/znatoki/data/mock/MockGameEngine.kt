@@ -590,7 +590,7 @@ internal class MockGameEngine(
                     else -> 0
                 }
                 if (add > 0) {
-                    val newEnds = st.phase.endsAt + add * 1000L
+                    val newEnds = st.phase.endsAt + ms(add * 1000L)
                     st = st.copy(phase = st.phase.copy(endsAt = newEnds))
                     emit { ServerEvent.TimeExtendedEvt(add, newEnds, it) }
                     snapshot()
