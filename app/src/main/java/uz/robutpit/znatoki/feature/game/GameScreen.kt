@@ -439,7 +439,13 @@ private fun ActionBar(
                 }
                 Spacer(Modifier.width(8.dp))
                 Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    if (discuss && ui.canFinishDiscussion) ClubButton(stringResource(R.string.action_ready_answer), onReady, Modifier.weight(1f))
+                    // досрочный ответ: не в блице и только пока на таймере больше 10 секунд
+                    val single = (room.question?.subTotal ?: 1) <= 1
+                    var earlyAllowed by remember(room.phase.endsAt) { mutableStateOf(room.phase.endsAt - serverNow() > 10_000) }
+                    LaunchedEffect(room.phase.endsAt, discuss) {
+                        while (discuss && earlyAllowed) { kotlinx.coroutines.delay(250); earlyAllowed = room.phase.endsAt - serverNow() > 10_000 }
+                    }
+                    if (discuss && ui.canFinishDiscussion && single && earlyAllowed) ClubButton(stringResource(R.string.action_ready_answer), onReady, Modifier.weight(1f))
                     if (discuss) OutlinedButton(onClick = onExtra, Modifier.heightIn(min = 48.dp), enabled = room.vote == null && (room.extraMinutesLeft > 0 || room.timeBankSec > 0)) {
                         Icon(Icons.Filled.MoreTime, stringResource(R.string.action_extra_minute))
                     }

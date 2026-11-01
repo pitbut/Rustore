@@ -413,6 +413,8 @@ fun errorRes(code: String): Int? = when (code) {
     "game_started" -> R.string.err_game_started
     "google_unavailable" -> R.string.err_google_unavailable
     "google_failed" -> R.string.err_google_failed
+    "no_early_in_blitz" -> R.string.err_no_early_in_blitz
+    "early_too_late" -> R.string.err_early_too_late
     "invalid_token" -> R.string.err_unauthorized
     else -> null
 }

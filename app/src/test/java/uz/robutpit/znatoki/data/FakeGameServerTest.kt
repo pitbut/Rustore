@@ -30,6 +30,8 @@ class FakeGameServerTest {
         var reveals = 0
         var spinsChecked = 0
         var chooses = 0
+        var sectorsChecked = 0
+        var blitzSectors = 0
         var botAnswerers = 0
         var timeoutCaptain = 0
         var answerPhaseMs = 0L
@@ -48,6 +50,18 @@ class FakeGameServerTest {
         val done = CompletableDeferred<Unit>()
         var askedExtra = false; var askedAudience = false; var askedKick = false; var appealed = false
         val answered = AtomicInteger()
+        var sumAtSpin: Int? = null
+        var sectorType: SectorType? = null
+        fun checkSectorPoint(s: RoomState) {
+            val sum = s.score.experts + s.score.viewers
+            sumAtSpin?.let { before ->
+                // любой сектор, включая блиц и суперблиц (3 вопроса), даёт ровно одно очко
+                assertEquals("очков за сектор $sectorType", 1, sum - before)
+                st.sectorsChecked++
+                if (sectorType == SectorType.BLITZ || sectorType == SectorType.SUPERBLITZ) st.blitzSectors++
+            }
+            sumAtSpin = sum
+        }
 
         val job = launch(Dispatchers.Default, start = CoroutineStart.UNDISPATCHED) {
             server.events.collect { e ->
@@ -59,7 +73,7 @@ class FakeGameServerTest {
                         server.send(ClientAction.Ready(true)); server.send(ClientAction.Start)
                     }
                     is ServerEvent.PhaseEvt -> { if (System.getenv("TRACE") != null) println("T+${System.currentTimeMillis() % 100000} ${e.info.phase} dur=${e.info.endsAt - System.currentTimeMillis() - 1250}"); when (e.info.phase) {
-                        Phase.SPIN -> if (s.players.first { it.isCaptain }.id == "me") server.send(ClientAction.Spin)
+                        Phase.SPIN -> { checkSectorPoint(s); if (s.players.first { it.isCaptain }.id == "me") server.send(ClientAction.Spin) }
                         Phase.DISCUSS -> {
                             if (!askedExtra) { askedExtra = true; server.send(ClientAction.ExtraMinuteRequest) }
                             else if (!askedAudience && s.question?.subTotal == 1) { askedAudience = true; server.send(ClientAction.CallAudience) }
@@ -98,6 +112,7 @@ class FakeGameServerTest {
                     }
                     is ServerEvent.QuestionEvt -> {
                         st.types += e.question.type
+                        sectorType = e.question.type
                         assertFalse("answer must not leak", e.question.text.contains(bank[e.question.id]?.answer ?: "\u0000") && e.question.type == SectorType.NORMAL)
                     }
                     is ServerEvent.VoteStartedEvt -> { st.votes += e.vote.kind; if (e.vote.initiatorId != "me") server.send(ClientAction.VoteCast(e.vote.voteId, true)) }
@@ -109,7 +124,7 @@ class FakeGameServerTest {
                         if (e.reveal.appealable && !appealed) { appealed = true; st.appeals++; server.send(ClientAction.Appeal) }
                     }
                     is ServerEvent.ErrorEvt -> st.errors += e.code
-                    is ServerEvent.GameOverEvt -> { st.over = e.over; st.score = s.score; done.complete(Unit) }
+                    is ServerEvent.GameOverEvt -> { checkSectorPoint(s); st.over = e.over; st.score = s.score; done.complete(Unit) }
                     else -> Unit
                 }
             }
@@ -124,14 +139,15 @@ class FakeGameServerTest {
     @Test fun `full games reach 6 points and cover every sector type`() {
         val all = mutableSetOf<SectorType>()
         val votes = mutableSetOf<VoteKind>()
-        var extended = 0; var kicked = 0; var audience = 0; var spins = 0; var chooses = 0; var botAns = 0
+        var extended = 0; var kicked = 0; var audience = 0; var spins = 0; var chooses = 0; var botAns = 0; var blitzTotal = 0
         for (seed in 1..6) {
             val st = playGame(seed, RoomSettings(teamSize = 5, fillWithBots = true, sectors = 13, discussSec = 30, rated = true))
             assertNotNull(st.over)
             assertTrue("score ${st.score}", st.score.experts == 6 || st.score.viewers == 6)
             assertEquals(if (st.score.experts == 6) "experts" else "viewers", st.over!!.winner)
             all += st.types; votes += st.votes
-            chooses += st.chooses; botAns += st.botAnswerers
+            chooses += st.chooses; botAns += st.botAnswerers; blitzTotal += st.blitzSectors
+            assertTrue(st.sectorsChecked > 0)
             assertTrue("answer phase ~30 s scaled", st.answerPhaseMs in 150..400)
             extended += st.timeExtended; kicked += st.kicked; audience += st.audienceSuggestions; spins += st.spinsChecked
             assertFalse("unexpected errors ${st.errors}", st.errors.any { it == "not_in_room" || it == "unauthorized" })
@@ -143,6 +159,7 @@ class FakeGameServerTest {
         assertTrue("audience help gave versions", audience > 0)
         assertTrue(spins >= 6)
         assertTrue("captain chose answerer", chooses > 0)
+        assertTrue("blitz scored as one point", blitzTotal > 0)
         assertTrue("chosen bot answered", botAns > 0)
         println("types=$all votes=$votes extended=$extended kicked=$kicked audience=$audience spins=$spins")
     }

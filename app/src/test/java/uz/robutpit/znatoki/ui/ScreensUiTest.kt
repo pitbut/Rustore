@@ -168,6 +168,7 @@ class ScreensUiTest {
                 )
             }
         }
+        rule.onNodeWithText("Сказать ответ голосом").assertHasClickAction()
         rule.onNodeWithText("Ответ команды").performTextInput("Азот")
         rule.mainClock.advanceTimeBy(1200)
         rule.onNodeWithText("Отправить ответ").performClick()

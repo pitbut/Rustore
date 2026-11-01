@@ -439,4 +439,8 @@
     <string name="login_or">yoki e-mail orqali</string>
     <string name="err_google_unavailable">Bu telefonda Google orqali kirish mavjud emas. E-mail orqali kiring.</string>
     <string name="err_google_failed">Google orqali kirib bo\'lmadi. Qayta urinib ko\'ring.</string>
+    <string name="answer_voice_button">Javobni ovoz bilan aytish</string>
+    <string name="blitz_rule">Uchala to\'g\'ri javob uchun bitta ochko. Birinchi xato — ochko tomoshabinlarga.</string>
+    <string name="err_no_early_in_blitz">Blitsda muddatidan oldin javob berilmaydi</string>
+    <string name="err_early_too_late">Muddatidan oldin javob faqat 10 soniyadan ko\'proq qolganda mumkin</string>
 </resources>

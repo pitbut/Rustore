@@ -138,6 +138,7 @@ fun QuestionCard(q: GameQuestion, blackboxOpen: Boolean, modifier: Modifier = Mo
             Text(text, style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.SemiBold), color = MaterialTheme.colorScheme.onSurface)
         }
         q.hint?.let { Spacer(Modifier.height(6.dp)); Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        if (q.subTotal > 1) { Spacer(Modifier.height(6.dp)); Text(stringResource(R.string.blitz_rule), style = MaterialTheme.typography.bodySmall, color = Club.colors.brass) }
     }
 }
 
@@ -251,14 +252,22 @@ fun AnswerInput(
         OutlinedTextField(
             text, { text = it.take(120); viaVoice = false }, Modifier.fillMaxWidth(), singleLine = true, enabled = !sent,
             label = { Text(stringResource(R.string.answer_hint)) },
-            trailingIcon = {
-                if (voiceAvailable) IconButton(onClick = { onVoice { recognized -> text = recognized; viaVoice = true } }) {
-                    Icon(Icons.Filled.KeyboardVoice, stringResource(R.string.cd_voice_answer))
-                }
-            },
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
             keyboardActions = KeyboardActions(onSend = { if (text.isNotBlank() && guard.allow()) { sent = true; onSubmit(text, viaVoice) } }),
         )
+        // микрофон — отдельной большой кнопкой, чтобы не попадать в поле ввода
+        if (voiceAvailable && !sent) {
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = { onVoice { recognized -> text = recognized; viaVoice = true } },
+                modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Club.colors.brass),
+            ) {
+                Icon(Icons.Filled.KeyboardVoice, null, Modifier.size(28.dp), tint = Club.colors.brass)
+                Spacer(Modifier.width(10.dp))
+                Text(stringResource(R.string.answer_voice_button), style = MaterialTheme.typography.labelLarge)
+            }
+        }
         if (viaVoice) Text(stringResource(R.string.answer_voice_confirm), style = MaterialTheme.typography.bodySmall, color = Club.colors.brass)
         Spacer(Modifier.height(8.dp))
         ClubButton(

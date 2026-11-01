@@ -439,4 +439,8 @@
     <string name="login_or">или по e-mail</string>
     <string name="err_google_unavailable">Вход через Google недоступен на этом телефоне. Войдите по e-mail.</string>
     <string name="err_google_failed">Не удалось войти через Google. Попробуйте ещё раз.</string>
+    <string name="answer_voice_button">Сказать ответ голосом</string>
+    <string name="blitz_rule">Одно очко за все три верных ответа. Первая ошибка — очко зрителям.</string>
+    <string name="err_no_early_in_blitz">В блице досрочного ответа нет</string>
+    <string name="err_early_too_late">Досрочный ответ возможен, пока осталось больше 10 секунд</string>
 </resources>

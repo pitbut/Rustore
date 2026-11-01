@@ -65,6 +65,8 @@ internal class MockGameEngine(
 
     // текущий раунд
     private var currentAnswerer: String = MockData.ME
+    /** Секунды досрочного ответа: попадут в копилку, только если ответ окажется верным. */
+    private var pendingBank = 0
     private var myLastTeamMessage: String? = null
     private var botChatJob: Job? = null
     private var hallChatJob: Job? = null
@@ -245,11 +247,13 @@ internal class MockGameEngine(
 
             val parts = if (q.parts.isNotEmpty() && sector.type.subQuestions > 1) q.parts.take(3)
             else listOf(QuestionPart(q.text, q.answer, q.accepted, q.comment))
+            // Блиц/суперблиц: за все три вопроса — одно очко. Первая ошибка — очко зрителям, блиц окончен.
             var over = false
             for ((k, part) in parts.withIndex()) {
                 currentPart = part
-                over = playQuestion(q, part, k, parts.size, sector)
-                if (over) break
+                val r = playQuestion(q, part, k, parts.size, sector)
+                over = r.gameOver
+                if (over || r.roundFinished) break
             }
             // снять ограничения суперблица
             if (st.players.any { it.micMutedByHost }) {
@@ -288,9 +292,11 @@ internal class MockGameEngine(
         return q
     }
 
-    /** @return true — игра окончена. */
-    private suspend fun playQuestion(q: Question, part: QuestionPart, k: Int, total: Int, sector: Sector): Boolean {
+    private data class QuestionResult(val roundFinished: Boolean, val gameOver: Boolean)
+
+    private suspend fun playQuestion(q: Question, part: QuestionPart, k: Int, total: Int, sector: Sector): QuestionResult {
         val multi = total > 1
+        pendingBank = 0
         st = st.copy(question = GameQuestion(q.id, sector.type, part.text, q.imageUrl, q.hint, k, total, q.topic), reveal = null, audience = emptyList(), audienceEndsAt = 0)
         emit { ServerEvent.QuestionEvt(st.question!!, it) }
         if (multi) say(if (k == 0) part.text else "Вопрос ${k + 1}. ${part.text}") else if (myRole == Role.SPECTATOR || sector.type == SectorType.BLACKBOX) say(part.text)
@@ -304,14 +310,17 @@ internal class MockGameEngine(
         val cap = captain()
         if (cap.isBot && !multi) {
             if (st.audienceHelpLeft > 0 && rnd.nextFloat() < (if (myRole == Role.SPECTATOR) 0.45f else 0.15f)) launchLater(8000) { inbox.trySend(Msg.BotCallAudience) }
-            if (rnd.nextFloat() < 0.25f) launchLater(discussMs / 2) { inbox.trySend(Msg.BotReadyAnswer(cap.id)) }
+            if (rnd.nextFloat() < 0.25f && discussMs > 25_000) launchLater(discussMs / 2) { inbox.trySend(Msg.BotReadyAnswer(cap.id)) }
         }
         phase(Phase.DISCUSS, discussMs, sector.index) { m ->
             when {
-                m is Msg.Client && m.a is ClientAction.ReadyAnswer -> {
-                    if (currentAnswerer != MockData.ME) { error("not_captain"); false } else { earlyAnswer(); true }
+                m is Msg.Client && m.a is ClientAction.ReadyAnswer -> when {
+                    currentAnswerer != MockData.ME -> { error("not_captain"); false }
+                    multi -> { error("no_early_in_blitz"); false }                     // в блице досрочного ответа нет
+                    st.phase.endsAt - now() <= ms(10_000) -> { error("early_too_late"); false } // только пока осталось больше 10 с
+                    else -> { earlyAnswer(); true }
                 }
-                m is Msg.BotReadyAnswer -> { earlyAnswer(); true }
+                m is Msg.BotReadyAnswer -> if (!multi && st.phase.endsAt - now() > ms(10_000)) { earlyAnswer(); true } else false
                 m is Msg.Client && m.a is ClientAction.CallAudience -> { if (cap.id == MockData.ME) callAudience() else error("not_captain"); false }
                 m is Msg.BotCallAudience -> { callAudience(); false }
                 else -> false
@@ -371,45 +380,61 @@ internal class MockGameEngine(
         val raw = AnswerChecker.check(given, part.answer, part.accepted, q.rejected)
         val verdict = raw ?: aiJudge(given, part)
         val correct = verdict != Verdict.INCORRECT
-        val delta = if (correct) Score(1, 0) else Score(0, 1)
+        val lastPart = k == total - 1
+        // обычный вопрос: очко сразу; блиц: очко зрителям при первой ошибке, знатокам — только за все три верных
+        val roundFinished = !multi || !correct || lastPart
+        val delta = when {
+            !correct -> Score(0, 1)
+            roundFinished -> Score(1, 0)
+            else -> Score(0, 0)
+        }
         st = st.copy(score = Score(st.score.experts + delta.experts, st.score.viewers + delta.viewers))
         roundsPlayed++
         if (correct) correctCount++
+        // копилка: досрочные секунды засчитываются только за верный ответ
+        if (pendingBank > 0) {
+            if (correct) {
+                st = st.copy(timeBankSec = st.timeBankSec + pendingBank)
+                snapshot()
+                say("Ответ верный — $pendingBank секунд уходят в копилку команды.")
+            }
+            pendingBank = 0
+        }
 
         // ---- REVEAL ----
         val reveal = Reveal(
             answer = part.answer, comment = part.comment.ifBlank { q.comment }, source = q.source, verdict = verdict,
             scoreDelta = delta, givenAnswer = given.ifBlank { null }, questionId = q.id,
-            appealable = verdict == Verdict.INCORRECT && given.isNotBlank() && st.appealsLeft > 0 && myRole == Role.PLAYER,
+            appealable = !multi && verdict == Verdict.INCORRECT && given.isNotBlank() && st.appealsLeft > 0 && myRole == Role.PLAYER,
         )
         st = st.copy(reveal = reveal)
-        if (k == total - 1) st = st.copy(sectors = st.sectors.map { if (it.index == sector.index) it.copy(played = true) else it })
+        if (roundFinished) st = st.copy(sectors = st.sectors.map { if (it.index == sector.index) it.copy(played = true) else it })
         emit { ServerEvent.RevealEvt(reveal, it) }
         say(
-            when (verdict) {
-                Verdict.CORRECT -> "Правильный ответ: ${part.answer}. Очко знатокам!"
-                Verdict.DISPUTED -> "Ответ засчитан с пометкой спорного. Правильный ответ: ${part.answer}."
-                Verdict.INCORRECT -> "Правильный ответ: ${part.answer}. Очко получают зрители."
+            when {
+                multi && !correct -> "Неверно. Правильный ответ: ${part.answer}. Блиц проигран — очко получают зрители."
+                multi && !lastPart -> "Верно! Следующий вопрос."
+                multi -> "Верно! Все три вопроса взяты — очко знатокам!"
+                verdict == Verdict.CORRECT -> "Правильный ответ: ${part.answer}. Очко знатокам!"
+                verdict == Verdict.DISPUTED -> "Ответ засчитан с пометкой спорного. Правильный ответ: ${part.answer}."
+                else -> "Правильный ответ: ${part.answer}. Очко получают зрители."
             }
         )
-        phase(Phase.REVEAL, if (multi) 5000 else 9000, if (k == total - 1) sector.index else -1) { m ->
+        phase(Phase.REVEAL, if (multi) 5000 else 9000, if (roundFinished) sector.index else -1) { m ->
             if (m is Msg.Client && m.a is ClientAction.Appeal) { appeal(given, part); false } else false
         }
 
         // ---- SCORE ----
         emit { ServerEvent.ScoreEvt(st.score, it) }
         phase(Phase.SCORE, 2200, sector.index)
-        return st.score.experts >= 6 || st.score.viewers >= 6
+        return QuestionResult(roundFinished, st.score.experts >= 6 || st.score.viewers >= 6)
     }
 
+    /** Досрочный ответ: остаток (вниз до 5 с) запоминается и попадёт в копилку только при верном ответе. */
     private fun earlyAnswer() {
-        val remSec = ((st.phase.endsAt - now()) / 1000).toInt()
-        val banked = (remSec / 5) * 5
-        if (banked > 0) {
-            st = st.copy(timeBankSec = st.timeBankSec + banked)
-            snapshot()
-            say("Досрочный ответ! $banked секунд уходят в копилку команды.")
-        }
+        val remSec = ((st.phase.endsAt - now()) / ms(1000).coerceAtLeast(1)).toInt()
+        pendingBank = (remSec / 5) * 5
+        say(if (pendingBank > 0) "Досрочный ответ! Если он верный, $pendingBank секунд уйдут в копилку." else "Досрочный ответ!")
     }
 
     private fun aiJudge(given: String, part: QuestionPart): Verdict {
