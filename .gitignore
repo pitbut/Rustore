@@ -10,3 +10,4 @@ build/
 keystore.properties
 *.jks
 *.keystore
+.kotlin/
