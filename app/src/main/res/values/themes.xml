@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Znatoki" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/bg_dark</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+    <style name="Theme.Znatoki.Splash" parent="Theme.Znatoki">
+        <item name="android:windowBackground">@drawable/splash_bg</item>
+    </style>
+    <color name="bg_dark">#FF0D1719</color>
+    <color name="brass">#FFD4A853</color>
+    <color name="ic_launcher_background">#FF0E2B28</color>
+</resources>
