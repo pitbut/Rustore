@@ -414,6 +414,7 @@ fun errorRes(code: String): Int? = when (code) {
     "google_unavailable" -> R.string.err_google_unavailable
     "google_failed" -> R.string.err_google_failed
     "no_early_in_blitz" -> R.string.err_no_early_in_blitz
+    "voice_unavailable" -> R.string.err_voice_unavailable
     "early_too_late" -> R.string.err_early_too_late
     "invalid_token" -> R.string.err_unauthorized
     else -> null

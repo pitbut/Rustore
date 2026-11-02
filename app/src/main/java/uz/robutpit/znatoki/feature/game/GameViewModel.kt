@@ -161,7 +161,11 @@ class GameViewModel @Inject constructor(
         viewModelScope.launch {
             voice.connect(roomId, settings.noiseSuppression)
             // голос недоступен (на сервере нет ключей LiveKit) — играем через чат, без foreground-service
-            if (voice.status.value != VoiceStatus.ON) { voiceStarted = false; return@launch }
+            if (voice.status.value != VoiceStatus.ON) {
+                voiceStarted = false
+                _events.emit(GameEvent.Error("voice_unavailable")) // честно говорим, что голоса нет — играем через чат
+                return@launch
+            }
             GameAudioService.start(context)
             if (settings.micMode == MicMode.OPEN && ui.value.mutedByHost.not()) voice.setMic(true)
         }
@@ -169,6 +173,7 @@ class GameViewModel @Inject constructor(
 
     fun toggleMic() {
         if (ui.value.mutedByHost) { _events.tryEmit(GameEvent.Error("mic_muted_by_host")); return }
+        if (voice.status.value != VoiceStatus.ON && voice.status.value != VoiceStatus.RECONNECTING) { _events.tryEmit(GameEvent.Error("voice_unavailable")); return }
         voice.setMic(!voice.micOn.value)
     }
 
