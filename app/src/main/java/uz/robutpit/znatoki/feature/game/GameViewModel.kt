@@ -159,8 +159,15 @@ class GameViewModel @Inject constructor(
         if (!granted || role == Role.SPECTATOR || voiceStarted) return
         voiceStarted = true
         viewModelScope.launch {
-            voice.connect(roomId, settings.noiseSuppression)
-            // голос недоступен (на сервере нет ключей LiveKit) — играем через чат, без foreground-service
+            // сервер выдаёт голосовой токен только тем, кто уже в комнате — ждём снимок комнаты
+            kotlinx.coroutines.withTimeoutOrNull(20_000) { session.state.first { it?.roomId == roomId } }
+            // несколько попыток: вход в комнату мог ещё не дойти до сервера, или сеть моргнула
+            for (attempt in 0 until 4) {
+                voice.connect(roomId, settings.noiseSuppression)
+                if (voice.status.value == VoiceStatus.ON) break
+                kotlinx.coroutines.delay(1500L * (attempt + 1))
+            }
+            // голос недоступен — играем через чат, без foreground-service
             if (voice.status.value != VoiceStatus.ON) {
                 voiceStarted = false
                 _events.emit(GameEvent.Error("voice_unavailable")) // честно говорим, что голоса нет — играем через чат
@@ -173,7 +180,11 @@ class GameViewModel @Inject constructor(
 
     fun toggleMic() {
         if (ui.value.mutedByHost) { _events.tryEmit(GameEvent.Error("mic_muted_by_host")); return }
-        if (voice.status.value != VoiceStatus.ON && voice.status.value != VoiceStatus.RECONNECTING) { _events.tryEmit(GameEvent.Error("voice_unavailable")); return }
+        if (voice.status.value != VoiceStatus.ON && voice.status.value != VoiceStatus.RECONNECTING) {
+            // повторная попытка подключить голос по нажатию на микрофон
+            if (!voiceStarted && role == Role.PLAYER) { onMicPermission(true); return }
+            _events.tryEmit(GameEvent.Error("voice_unavailable")); return
+        }
         voice.setMic(!voice.micOn.value)
     }
 
