@@ -444,4 +444,7 @@
     <string name="err_no_early_in_blitz">В блице досрочного ответа нет</string>
     <string name="err_early_too_late">Досрочный ответ возможен, пока осталось больше 10 секунд</string>
     <string name="err_voice_unavailable">Голосовой чат пока недоступен — общайтесь через чат команды</string>
+    <string name="create_spectators_hear">Зрители слышат обсуждение</string>
+    <string name="create_spectators_hear_sub">Зрители слушают голос команды, но говорить не могут</string>
+    <string name="spectator_listening">🎧 Вы слушаете обсуждение команды</string>
 </resources>

@@ -59,6 +59,8 @@ data class RoomSettings(
     val audienceHelp: Boolean = true,
     val rated: Boolean = false,
     val allowSpectators: Boolean = true,
+    /** Зрители слышат голосовое обсуждение команды (только слушают, говорить не могут). */
+    val spectatorsHearTeam: Boolean = true,
     val packId: String? = null,
     val superblitzByCaptain: Boolean = false,
     val special13: Boolean = false,

@@ -97,6 +97,7 @@ fun CreateRoomScreen(onBack: () -> Unit, onCreated: (String) -> Unit, vm: Create
             SwitchRow(stringResource(R.string.create_audience), s.audienceHelp) { b -> vm.update { it.copy(audienceHelp = b) } }
             SwitchRow(stringResource(R.string.create_rated), s.rated) { b -> vm.update { it.copy(rated = b) } }
             SwitchRow(stringResource(R.string.create_spectators), s.allowSpectators) { b -> vm.update { it.copy(allowSpectators = b) } }
+            if (s.allowSpectators) SwitchRow(stringResource(R.string.create_spectators_hear), s.spectatorsHearTeam, stringResource(R.string.create_spectators_hear_sub)) { b -> vm.update { it.copy(spectatorsHearTeam = b) } }
             SwitchRow(stringResource(R.string.create_superblitz_captain), s.superblitzByCaptain) { b -> vm.update { it.copy(superblitzByCaptain = b) } }
             SwitchRow(stringResource(R.string.create_special13), s.special13) { b -> vm.update { it.copy(special13 = b) } }
             SettingGroup(stringResource(R.string.create_pack)) {

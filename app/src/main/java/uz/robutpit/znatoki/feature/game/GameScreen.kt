@@ -454,7 +454,10 @@ private fun ActionBar(
                     }
                 }
             } else {
-                Text(stringResource(R.string.spectator_mode), Modifier.weight(1f), style = MaterialTheme.typography.labelLarge)
+                Text(
+                    stringResource(if (ui.voiceStatus == uz.robutpit.znatoki.voice.VoiceStatus.ON) R.string.spectator_listening else R.string.spectator_mode),
+                    Modifier.weight(1f), style = MaterialTheme.typography.labelLarge,
+                )
                 if (room.audienceEndsAt > serverNow()) ClubButton(stringResource(R.string.audience_help_title), onOpenAudience)
             }
             IconButton(onClick = onChat, Modifier.size(52.dp)) {

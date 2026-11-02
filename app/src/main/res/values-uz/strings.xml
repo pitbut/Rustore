@@ -444,4 +444,7 @@
     <string name="err_no_early_in_blitz">Blitsda muddatidan oldin javob berilmaydi</string>
     <string name="err_early_too_late">Muddatidan oldin javob faqat 10 soniyadan ko\'proq qolganda mumkin</string>
     <string name="err_voice_unavailable">Ovozli chat hozircha mavjud emas — jamoa chatidan foydalaning</string>
+    <string name="create_spectators_hear">Tomoshabinlar muhokamani eshitadi</string>
+    <string name="create_spectators_hear_sub">Tomoshabinlar jamoa ovozini eshitadi, lekin gapira olmaydi</string>
+    <string name="spectator_listening">🎧 Siz jamoa muhokamasini tinglayapsiz</string>
 </resources>

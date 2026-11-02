@@ -94,6 +94,17 @@ class GameViewModel @Inject constructor(
 
     init {
         session.join(roomId, null, role)
+        // зритель слушает обсуждение команды (без микрофона), если это разрешено в настройках комнаты
+        if (role == Role.SPECTATOR) viewModelScope.launch {
+            val room = kotlinx.coroutines.withTimeoutOrNull(20_000) { session.state.first { it?.roomId == roomId } } ?: return@launch
+            if (!room.settings.spectatorsHearTeam) return@launch
+            for (attempt in 0 until 4) {
+                voice.connect(roomId, false)
+                if (voice.status.value == VoiceStatus.ON) break
+                kotlinx.coroutines.delay(1500L * (attempt + 1))
+            }
+            if (voice.status.value != VoiceStatus.ON) _events.emit(GameEvent.Error("voice_unavailable"))
+        }
         host.setLang(LocaleHelper.current(context))
         viewModelScope.launch { settingsRepo.settings.collect { settings = it } }
         viewModelScope.launch { session.hostLines.collect { host.say(it.text, it.voiceStyle) } }
